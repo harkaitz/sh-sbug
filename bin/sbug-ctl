@@ -1,0 +1,125 @@
+#!/bin/sh -e
+##:
+#h: Usage: sbug-ctl ...
+#h:
+#h: Simple bug tracking system administration utility.
+#h:
+#h:   show                Show configuration.
+#h:   install [USERS...]  Create "/var/lib/sbug".
+#h:   refill              Create new empty tasks in "/var/lib/sbug/@new".
+#h:   clear               Remove tasks in "/var/lib/sbug/@new".
+#h:
+#h: Environment variables: SBUG_{DIRECTORY,SUDO,GROUP}
+##:
+sbug_ctl() {
+    local cmd="$1"
+    shift
+    case "${cmd}" in
+        show)    sbug_ctl_show_variables ;;
+        install) sbug_install "$@"       ;;
+        refill)  sbug_refill             ;;
+        clear)   sbug_clear              ;;
+        *)       echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
+    esac
+}
+sbug_ctl_show_variables() {
+    cat <<-EOF
+	SBUG_DIRECTORY : ${SBUG_DIRECTORY}
+	SBUG_SUDO      : ${SBUG_SUDO}
+	SBUG_GROUP     : ${SBUG_GROUP}
+	SBUG_NO_PERM   : ${SBUG_NO_PERM}
+	EOF
+}
+sbug_ctl_calc_variables() {
+    SBUG_DIRECTORY="${SBUG_DIRECTORY:-/var/lib/sbug}"
+    if test -n "${SBUG_SUDO}"; then
+        true
+    elif test -w /etc/hosts; then
+        SBUG_SUDO="env"
+    elif which sudo >/dev/null 2>&1; then
+        SBUG_SUDO="sudo"
+    elif which runas >/dev/null 2>&1; then
+        SBUG_SUDO="runas"
+    else
+        echo >&2 "error: Run this program as root."
+        return 1
+    fi
+    SBUG_GROUP="${SBUG_GROUP:-sbug}"
+}
+## -------------------------------------------------------------------
+sbug_install() {
+    
+    ## Create central directory.
+    if test ! -f "${SBUG_DIRECTORY}/@id"; then
+        ${SBUG_SUDO} mkdir -p "${SBUG_DIRECTORY}"
+        ${SBUG_SUDO} tee "${SBUG_DIRECTORY}/@id" <<-EOF >/dev/null
+	1
+	EOF
+    fi
+    
+    ## Create task directories.
+    ${SBUG_SUDO} mkdir -p \
+                 "${SBUG_DIRECTORY}/@todo"   \
+                 "${SBUG_DIRECTORY}/@closed" \
+                 "${SBUG_DIRECTORY}/@done"   \
+                 "${SBUG_DIRECTORY}/@new"    \
+                 "${SBUG_DIRECTORY}/@cancelled"
+    if test ! -n "${SBUG_NO_PERM}"; then
+        ${SBUG_SUDO} chown root:"${SBUG_GROUP}"  \
+                     "${SBUG_DIRECTORY}/@todo"   \
+                     "${SBUG_DIRECTORY}/@closed" \
+                     "${SBUG_DIRECTORY}/@done"   \
+                     "${SBUG_DIRECTORY}/@new"    \
+                     "${SBUG_DIRECTORY}/@cancelled"
+        ${SBUG_SUDO} chmod 0770 \
+                     "${SBUG_DIRECTORY}/@todo"   \
+                     "${SBUG_DIRECTORY}/@closed" \
+                     "${SBUG_DIRECTORY}/@done"   \
+                     "${SBUG_DIRECTORY}/@new"    \
+                     "${SBUG_DIRECTORY}/@cancelled"
+    fi
+        
+    ## Add users to "sbug" group.
+    local u
+    for u in "$@"; do
+        ${SBUG_SUDO} usermod -a -G "${SBUG_GROUP}" "${u}"
+    done
+    
+    ## Refill new tasks.
+    sbug_refill
+}
+sbug_refill() {
+    local count="$(${SBUG_SUDO} find "${SBUG_DIRECTORY}/@new" -type f | wc -l)"
+    for n in $(seq ${count} 10); do
+        local id="$(cat "${SBUG_DIRECTORY}/@id")"
+        local idt="$(printf '%04i' "${id}")"
+        echo "Creating ${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt ..."
+        ${SBUG_SUDO} tee "${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt" <<-EOF >/dev/null
+	Project:
+	Type:       # bug/feature
+	Subject:
+	Public: no  # yes if it is meant to be shown to client.
+	Priority:   # 0 (Highest) 9 (Lowest)
+	Assignee:   # The assigned person.
+	Reporter:   # Your name.
+	
+	No description.
+	EOF
+        if test ! -n "${SBUG_NO_PERM}"; then
+            ${SBUG_SUDO} chown root:"${SBUG_GROUP}" "${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt"
+            ${SBUG_SUDO} chmod 0660 "${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt"
+        fi
+        echo "$((id + 1))" | ${SBUG_SUDO} tee "${SBUG_DIRECTORY}/@id" > /dev/null
+    done
+}
+sbug_clear() {
+    ${SBUG_SUDO} find "${SBUG_DIRECTORY}/@new" -type f -delete
+}
+## -------------------------------------------------------------------
+sbug_ctl_calc_variables
+if test @"${SCRNAME:-$(basename "$0")}" = @"sbug-ctl"; then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            sbug_ctl "$@"; exit 0;;
+    esac
+fi

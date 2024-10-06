@@ -1,0 +1,185 @@
+#!/bin/sh -e
+##:
+#h: Usage: sbug ...
+#h:
+#h: Simple bug tracking system for the command line and humans.
+#h:
+#h:   show            Show configuration.
+#h:   edit|e [ID]     Edit/create task with a text editor.
+#h:   ls|l            List tasks assigned to or created by the user.
+#h:   STATUS ID...    Move task to status. (todo|done|close|cancel)
+#h:   branch|b ID     Show the branch name for task.
+#h:   rename ID NAME  Change the slug for the task.
+#h:   view|v ID       View task.
+#h:
+#h: More documentation is available in sbug(1).
+##:
+sbug() {
+    local cmd="$1"
+    shift
+    case "${cmd}" in
+        show)      sbug_show_variables ;;
+        edit|e)    sbug_edit "$@"      ;;
+        ls|l)      sbug_ls "$@"        ;;
+        'todo')    sbug_move "@done @closed @cancelled" "@todo" "$@";;
+        'done')    sbug_move "@todo" "@done"    "$@" ;;
+        'close')   sbug_move "@done" "@closed"  "$@" ;;
+        'cancel')  sbug_move "@todo" "@invalid" "$@" ;;
+        branch|b)  sbug_branch "$@" ;;
+        rename)    sbug_rename "$@" ;;
+        view|v)    sbug_view   "$@" ;;
+        *)         echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
+    esac
+}
+sbug_show_variables() {
+    cat <<-EOF
+	SBUG_DIRECTORY : ${SBUG_DIRECTORY}
+	SBUG_USER      : ${SBUG_USER}
+	SBUG_EDITOR    : ${SBUG_EDITOR}
+	EOF
+}
+sbug_calc_variables() {
+    SBUG_DIRECTORY="${SBUG_DIRECTORY:-/var/lib/sbug}"
+    SBUG_USER="${SBUG_USER:-$(whoami)}"
+    SBUG_EDITOR="${SBUG_EDITOR:-rnano \$file}"
+}
+## -------------------------------------------------------------------
+sbug_edit() {
+    local file is_new desc id
+    if test ! -n "$1"; then
+        file="$(sbug_files @new | recsel -P File -e "Reporter = \"${SBUG_USER}\"" | head -n 1)"
+        if test ! -n "${file}"; then
+            file="$(sbug_files @new | recsel -P File -C -e 'Reporter = ""' | head -n 1)"
+            if test ! -n "${file}"; then
+                echo >&2 "sbug: error: Can't find a new free task."
+                return 1
+            fi
+            sed -i "s|^Reporter:|Reporter: ${SBUG_USER}|" "${file}"
+        fi
+        is_new=y
+    else
+        file="$(find "${SBUG_DIRECTORY}/@todo" "${SBUG_DIRECTORY}/@done" -type f -iregex ".*/@0*${1}_.*\\.txt" | head -n 1)"
+        if test ! -n "${file}"; then
+            echo >&2 "sbug: error: $1: Not found."
+            return 1
+        fi
+        is_new=
+    fi
+    id="$(sbug_get_id "${file}")"
+    eval "${SBUG_EDITOR}"
+    clear
+    if test -n "${is_new}" && \
+       grep -q '^Assignee: *[a-zA-Z0-9]' "${file}" && \
+       grep -q '^Reporter: *[a-zA-Z0-9]' "${file}" && \
+       grep -q '^Project: *[a-zA-Z0-9]' "${file}"
+    then
+        echo >&2 "==================================================="
+        cat >&2 "${file}"
+        echo >&2 "====="
+        echo >&2 -n "Type short slug to move to @todo, empty to skip: "
+        read desc
+        if test -n "${desc}"; then
+            mv "${file}" "${SBUG_DIRECTORY}/@todo/$(basename "${file}" | sed "s|_no_desc|_${desc}|")"
+        fi
+    fi
+}
+sbug_ls() {
+    sbug_files @todo @done | sbug_table "Reporter = \"${SBUG_USER}\" || Assignee = \"${SBUG_USER}\""
+}
+sbug_move() {
+    local from="$1" to="$2" id
+    shift 2
+    for id in "$@"; do
+        file="$(sbug_find "${id}" ${from})"
+        if test ! -n "${file}"; then
+            echo >&2 "sbug: error: ${id}: Not found in ${from}."
+            return 1
+        fi
+        mv "${file}" "${SBUG_DIRECTORY}/${to}"
+    done
+}
+sbug_branch() {
+    local id="$1"
+    sbug_chk_id "${id}"
+    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
+    if test ! -n "${file1}"; then
+        echo >&2 "sbug: error: ${id}: Not found."
+        return 1
+    fi
+    echo "task/$(sbug_get_id "${file1}")-$(sbug_get_slug "${file1}")"
+}
+sbug_rename() {
+    local id="$1" slug="$2"
+    sbug_chk_id "${id}"
+    sbug_chk_slug "${slug}"
+    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
+    if test ! -n "${file1}"; then
+        echo >&2 "sbug: error: ${id}: Not found."
+        return 1
+    fi
+    local file2="$(dirname "${file1}")/@$(sbug_get_id "${file1}")_${slug}.txt"
+    mv "${file1}" "${file2}"
+}
+sbug_view() {
+    local id="$1"
+    sbug_chk_id "${id}"
+    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
+    if test ! -n "${file1}"; then
+        echo >&2 "sbug: error: ${id}: Not found."
+        return 1
+    fi
+    echo "== ${file1}"
+    cat "${file1}"
+}
+
+## -------------------------------------------------------------------
+sbug_table() {
+    local priority state reporter assignee subject id slug
+    local fmt='%-8s %-5s %-7s %-12s %-12s %s\n'
+    printf "${fmt}" ID Prio State Reporter Assignee "Subject (slug)"
+    recsel -e "$1" -C -R File,Priority,State,Reporter,Assignee,Subject | \
+    while read -r file priority state reporter assignee subject; do
+        id="$(sbug_get_id "${file}")";     test -n "${id}"
+        slug="$(sbug_get_slug "${file}")"; test -n "${slug}"
+        printf "${fmt}" "${id}" "${priority}" "${state}" "${reporter}" "${assignee}" "${subject} (${slug})"
+    done
+}
+sbug_files() {
+    for d in "$@"; do
+        find "${SBUG_DIRECTORY}/${d}" -name '@*_*.txt' \
+             -exec printf 'File: %s\nState: %s\n' '{}' "$d" ';' \
+             -exec sed 's| *\#.*||;/^$/q' '{}' ';'
+    done
+}
+sbug_find() {
+    local id="$1" d; shift
+    for d in "$@"; do
+        find "${SBUG_DIRECTORY}/${d}" -type f -iregex ".*/@0*${id}_.*\\.txt" | head -n 1
+    done
+}
+sbug_chk_id() {
+    if test ! -n "${1}"; then
+        echo >&2 "sbug: error: Please specify an ID."
+        return 1
+    fi
+}
+sbug_chk_slug() {
+    if test ! -n "${1}"; then
+        echo >&2 "sbug: error: Please specify a slug."
+        return 1
+    fi
+}
+sbug_get_slug() {
+    basename "$1" | sed -n 's|^[^_]*_\(.*\)\.txt$|\1|p'
+}
+sbug_get_id() {
+    basename "$1" | sed -n 's|@\([0-9]*\)_.*|\1|p'
+}
+## -------------------------------------------------------------------
+sbug_calc_variables
+if test @"${SCRNAME:-$(basename "$0")}" = @"sbug"; then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            sbug "$@"; exit 0;;
+    esac
+fi
