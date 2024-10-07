@@ -1,5 +1,9 @@
 
 ## -- BLOCK:license --
 ## -- BLOCK:license --
+## -- BLOCK:mkdocs --
+doc/index.md
+site
+## -- BLOCK:mkdocs --
 ## -- BLOCK:sh --
 ## -- BLOCK:sh --

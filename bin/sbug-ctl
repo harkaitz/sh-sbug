@@ -63,20 +63,26 @@ sbug_install() {
                  "${SBUG_DIRECTORY}/@closed" \
                  "${SBUG_DIRECTORY}/@done"   \
                  "${SBUG_DIRECTORY}/@new"    \
-                 "${SBUG_DIRECTORY}/@cancelled"
+                 "${SBUG_DIRECTORY}/@cancelled" \
+                 "${SBUG_DIRECTORY}/@ongoing"   \
+                 "${SBUG_DIRECTORY}/@back"
     if test ! -n "${SBUG_NO_PERM}"; then
         ${SBUG_SUDO} chown root:"${SBUG_GROUP}"  \
                      "${SBUG_DIRECTORY}/@todo"   \
                      "${SBUG_DIRECTORY}/@closed" \
                      "${SBUG_DIRECTORY}/@done"   \
                      "${SBUG_DIRECTORY}/@new"    \
-                     "${SBUG_DIRECTORY}/@cancelled"
+                     "${SBUG_DIRECTORY}/@cancelled" \
+                     "${SBUG_DIRECTORY}/@ongoing" \
+                     "${SBUG_DIRECTORY}/@back"
         ${SBUG_SUDO} chmod 0770 \
                      "${SBUG_DIRECTORY}/@todo"   \
                      "${SBUG_DIRECTORY}/@closed" \
                      "${SBUG_DIRECTORY}/@done"   \
                      "${SBUG_DIRECTORY}/@new"    \
-                     "${SBUG_DIRECTORY}/@cancelled"
+                     "${SBUG_DIRECTORY}/@cancelled" \
+                     "${SBUG_DIRECTORY}/@ongoing" \
+                     "${SBUG_DIRECTORY}/@back"
     fi
         
     ## Add users to "sbug" group.

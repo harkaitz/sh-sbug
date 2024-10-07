@@ -7,8 +7,8 @@
 #h:   show            Show configuration.
 #h:   edit|e [ID]     Edit/create task with a text editor.
 #h:   ls|l            List tasks assigned to or created by the user.
-#h:   STATUS ID...    Move task to status. (todo|done|close|cancel)
-#h:   branch|b ID     Show the branch name for task.
+#h:   STATUS ID...    Move task to status. (todo|done|close|cancel|start|back)
+#h:   branch|b [ID]   Show the branch name and tag for commits.
 #h:   rename ID NAME  Change the slug for the task.
 #h:   view|v ID       View task.
 #h:
@@ -21,10 +21,12 @@ sbug() {
         show)      sbug_show_variables ;;
         edit|e)    sbug_edit "$@"      ;;
         ls|l)      sbug_ls "$@"        ;;
-        'todo')    sbug_move "@done @closed @cancelled" "@todo" "$@";;
-        'done')    sbug_move "@todo" "@done"    "$@" ;;
-        'close')   sbug_move "@done" "@closed"  "$@" ;;
-        'cancel')  sbug_move "@todo" "@invalid" "$@" ;;
+        'todo')    sbug_move "@done @ongoing @closed @cancelled @back" "@todo" "$@";;
+        'back')    sbug_move "@done @ongoing @closed @cancelled @todo" "@back" "$@";;
+        'done')    sbug_move "@todo @ongoing" "@done"      "$@" ;;
+        'close')   sbug_move "@done @ongoing" "@closed"    "$@" ;;
+        'cancel')  sbug_move "@todo @ongoing" "@cancelled" "$@" ;;
+        'start')   sbug_move "@todo"          "@ongoing"   "$@" ;;
         branch|b)  sbug_branch "$@" ;;
         rename)    sbug_rename "$@" ;;
         view|v)    sbug_view   "$@" ;;
@@ -58,7 +60,7 @@ sbug_edit() {
         fi
         is_new=y
     else
-        file="$(find "${SBUG_DIRECTORY}/@todo" "${SBUG_DIRECTORY}/@done" -type f -iregex ".*/@0*${1}_.*\\.txt" | head -n 1)"
+        file="$(sbug_find "$1" @todo @done @ongoing @closed @cancelled)"
         if test ! -n "${file}"; then
             echo >&2 "sbug: error: $1: Not found."
             return 1
@@ -84,7 +86,7 @@ sbug_edit() {
     fi
 }
 sbug_ls() {
-    sbug_files @todo @done | sbug_table "Reporter = \"${SBUG_USER}\" || Assignee = \"${SBUG_USER}\""
+    sbug_files @back @done @todo @ongoing | sbug_table "Reporter = \"${SBUG_USER}\" || Assignee = \"${SBUG_USER}\""
 }
 sbug_move() {
     local from="$1" to="$2" id
@@ -99,20 +101,25 @@ sbug_move() {
     done
 }
 sbug_branch() {
-    local id="$1"
-    sbug_chk_id "${id}"
-    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
-    if test ! -n "${file1}"; then
-        echo >&2 "sbug: error: ${id}: Not found."
-        return 1
+    local id="$1" file
+    if test -n "${id}"; then
+        file="$(sbug_find "${id}" @todo @closed @done @cancelled @ongoing)"
+        if test ! -n "${file}"; then
+            echo >&2 "sbug: error: ${id}: Not found."
+            return 1
+        fi
+        sbug_get_branch "${file}"
+    else
+        sbug_files @ongoing | recsel -e "Assignee = \"${SBUG_USER}\"" -C -R File | while read -r file; do
+            sbug_get_branch "${file}"
+        done
     fi
-    echo "task/$(sbug_get_id "${file1}")-$(sbug_get_slug "${file1}")"
 }
 sbug_rename() {
     local id="$1" slug="$2"
     sbug_chk_id "${id}"
     sbug_chk_slug "${slug}"
-    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
+    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled @ongoing)"
     if test ! -n "${file1}"; then
         echo >&2 "sbug: error: ${id}: Not found."
         return 1
@@ -123,7 +130,7 @@ sbug_rename() {
 sbug_view() {
     local id="$1"
     sbug_chk_id "${id}"
-    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled)"
+    local file1="$(sbug_find "${id}" @todo @closed @done @cancelled @ongoing)"
     if test ! -n "${file1}"; then
         echo >&2 "sbug: error: ${id}: Not found."
         return 1
@@ -131,12 +138,11 @@ sbug_view() {
     echo "== ${file1}"
     cat "${file1}"
 }
-
 ## -------------------------------------------------------------------
 sbug_table() {
     local priority state reporter assignee subject id slug
-    local fmt='%-8s %-5s %-7s %-12s %-12s %s\n'
-    printf "${fmt}" ID Prio State Reporter Assignee "Subject (slug)"
+    local fmt='%-8s %-5s %-10s %-12s %-12s %s\n'
+    printf "${fmt}\\n" ID Prio State Reporter Assignee "Subject (slug)"
     recsel -e "$1" -C -R File,Priority,State,Reporter,Assignee,Subject | \
     while read -r file priority state reporter assignee subject; do
         id="$(sbug_get_id "${file}")";     test -n "${id}"
@@ -174,6 +180,9 @@ sbug_get_slug() {
 }
 sbug_get_id() {
     basename "$1" | sed -n 's|@\([0-9]*\)_.*|\1|p'
+}
+sbug_get_branch() {
+    echo "task/$(sbug_get_id "${1}")-$(sbug_get_slug "${1}")"
 }
 ## -------------------------------------------------------------------
 sbug_calc_variables
