@@ -8,7 +8,7 @@
         
         
         <link rel="shortcut icon" href="img/favicon.ico">
-        <title>My Docs</title>
+        <title>SBUG (Simple Bug Tracker)</title>
         <link href="css/bootstrap.min.css" rel="stylesheet">
         <link href="css/font-awesome.min.css" rel="stylesheet">
         <link href="css/base.css" rel="stylesheet">
@@ -23,7 +23,7 @@
     <body class="homepage">
         <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
             <div class="container">
-                <a class="navbar-brand" href=".">My Docs</a>
+                <a class="navbar-brand" href=".">SBUG (Simple Bug Tracker)</a>
 
                 <!-- Expanded navigation -->
                 <div id="navbar-collapse" class="navbar-collapse collapse">
@@ -52,13 +52,13 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-light">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-level="1"><a href="#welcome-to-mkdocs" class="nav-link">Welcome to MkDocs</a>
+            <li class="nav-item" data-level="1"><a href="#sbug-simple-bug-tracker" class="nav-link">SBUG (Simple Bug Tracker)</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-level="2"><a href="#commands" class="nav-link">Commands</a>
+            <li class="nav-item" data-level="2"><a href="#help" class="nav-link">Help</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-level="2"><a href="#project-layout" class="nav-link">Project layout</a>
+            <li class="nav-item" data-level="2"><a href="#collaborating" class="nav-link">Collaborating</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -69,21 +69,48 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="welcome-to-mkdocs">Welcome to MkDocs</h1>
-<p>For full documentation visit <a href="https://www.mkdocs.org">mkdocs.org</a>.</p>
-<h2 id="commands">Commands</h2>
+<h1 id="sbug-simple-bug-tracker">SBUG (Simple Bug Tracker)</h1>
+<p>Small multiuser bug tracking system.</p>
 <ul>
-<li><code>mkdocs new [dir-name]</code> - Create a new project.</li>
-<li><code>mkdocs serve</code> - Start the live-reloading docs server.</li>
-<li><code>mkdocs build</code> - Build the documentation site.</li>
-<li><code>mkdocs -h</code> - Print help message and exit.</li>
+<li>TODO : Write manpage.</li>
+<li>TODO : Configurable template.</li>
+<li>TODO : Advantages section.</li>
 </ul>
-<h2 id="project-layout">Project layout</h2>
-<pre><code>mkdocs.yml    # The configuration file.
-docs/
-    index.md  # The documentation homepage.
-    ...       # Other markdown pages, images and other files.
-</code></pre></div>
+<h2 id="help">Help</h2>
+<p>sbug</p>
+<pre><code>Usage: sbug ...
+
+Simple bug tracking system for the command line and humans.
+
+  show            Show configuration.
+  edit|e [ID]     Edit/create task with a text editor.
+  ls|l            List tasks assigned to or created by the user.
+  STATUS ID...    Move task to status. (todo|done|close|cancel|start|back)
+  branch|b [ID]   Show the branch name and tag for commits.
+  rename ID NAME  Change the slug for the task.
+  view|v ID       View task.
+
+More documentation is available in sbug(1).
+</code></pre>
+<p>sbug-ctl</p>
+<pre><code>Usage: sbug-ctl ...
+
+Simple bug tracking system administration utility.
+
+  show                Show configuration.
+  install [USERS...]  Create "/var/lib/sbug".
+  refill              Create new empty tasks in "/var/lib/sbug/@new".
+  clear               Remove tasks in "/var/lib/sbug/@new".
+
+Environment variables: SBUG_{DIRECTORY,SUDO,GROUP}
+</code></pre>
+<h2 id="collaborating">Collaborating</h2>
+<p>For making bug reports, feature requests and donations visit
+one of the following links:</p>
+<ol>
+<li><a href="gemini://harkadev.com/oss/">gemini://harkadev.com/oss/</a></li>
+<li><a href="https://harkadev.com/oss/">https://harkadev.com/oss/</a></li>
+</ol></div>
             </div>
         </div>
 
@@ -164,5 +191,5 @@ docs/
 
 <!--
 MkDocs version : 1.4.2
-Build Date UTC : 2024-10-07 14:41:14.798035+00:00
+Build Date UTC : 2024-10-07 15:08:56.658614+00:00
 -->
