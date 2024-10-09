@@ -11,6 +11,7 @@
 #h:   branch|b [ID]   Show the branch name and tag for commits.
 #h:   rename ID NAME  Change the slug for the task.
 #h:   view|v ID       View task.
+#h:   rec             Print rec file (for scripting).
 #h:
 #h: More documentation is available in sbug(1).
 ##:
@@ -30,6 +31,7 @@ sbug() {
         branch|b)  sbug_branch "$@" ;;
         rename)    sbug_rename "$@" ;;
         view|v)    sbug_view   "$@" ;;
+        rec)       sbug_files ${@:-@back @done @todo @ongoing} ;;
         *)         echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
     esac
 }
@@ -140,21 +142,33 @@ sbug_view() {
 }
 ## -------------------------------------------------------------------
 sbug_table() {
-    local priority state reporter assignee subject id slug
-    local fmt='%-8s %-5s %-10s %-12s %-12s %s\n'
-    printf "${fmt}\\n" ID Prio State Reporter Assignee "Subject (slug)"
-    recsel -e "$1" -C -R File,Priority,State,Reporter,Assignee,Subject | \
-    while read -r file priority state reporter assignee subject; do
+    local priority state project public changelog reporter assignee subject id slug
+    local fmt='%-8s %-5s %-10s %-10s %-12s %-12s %s\n'
+    printf "${fmt}\\n" ID Prio State Project Reporter Assignee "Subject (slug)"
+    recset -e 'Changelog != ""' -f Changelog -s yes | \
+    recset -e 'Changelog == ""' -f Changelog -a no  | \
+    recset -e 'Public == ""'    -f Public    -a no  | \
+    recset -e 'Priority == ""'  -f Priority  -a 5   | \
+    recsel -S Priority | \
+    recsel -e "$1" -C -R File,Priority,State,Project,Public,Changelog,Reporter,Assignee,Subject | \
+    while read -r file priority state project public changelog reporter assignee subject; do
+        if test @"${public}" = @"no"; then
+            public=
+        fi
+        if test @"${changelog}" = @"no"; then
+            changelog=
+        fi
         id="$(sbug_get_id "${file}")";     test -n "${id}"
         slug="$(sbug_get_slug "${file}")"; test -n "${slug}"
-        printf "${fmt}" "${id}" "${priority}" "${state}" "${reporter}" "${assignee}" "${subject} (${slug})"
+        printf "${fmt}" "${id}" "${priority}" "${state}" "${project}${public:+*}${changelog:+@}" "${reporter}" "${assignee}" "${subject} (${slug})"
     done
 }
 sbug_files() {
     for d in "$@"; do
         find "${SBUG_DIRECTORY}/${d}" -name '@*_*.txt' \
              -exec printf 'File: %s\nState: %s\n' '{}' "$d" ';' \
-             -exec sed 's| *\#.*||;/^$/q' '{}' ';'
+             -exec sed 's| *\#.*||;/^\s*$/{p;q;}' '{}' ';' \
+             -exec printf '\n' ';'
     done
 }
 sbug_find() {

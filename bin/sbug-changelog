@@ -1,0 +1,91 @@
+#!/bin/sh -e
+##:
+#h: Usage: sbug-changelog [-f FILE][-v VERSION][PROJECT]
+#h:
+#h: This program generates a changelog based on the tasks in "@done"
+#h: and a single release task in "@ongoing" with the following fields:
+#h:
+#h:   Project: PROJECT            Project: PROJECT
+#h:   Public: yes                 Type: release
+#h:   Changelog: MESSAGE          Changelog: MESSAGE
+#h:
+#h: Write the following target in your makefile for automatic changelog
+#h: generation.
+#h:
+#h:   .PHONY: CHANGELOG.md
+#h:   CHANGELOG.md:
+#h:       sbug-changelog -f CHANGELOG.md -v $(VERSION) MyProject
+#h:
+#h: Once the release is published you should close all the tasks.
+##:
+. sbug
+sbug_changelog() {
+    local OPTIND optopt filter CHANGELOG_FILE= VERSION= PROJECT= RELFILE= MESSAGE=
+    
+    ## Parse command line arguments.
+    while getopts "f:v:" optopt; do
+        case $optopt in
+            f)  CHANGELOG_FILE="${OPTARG}";;
+            v)  VERSION="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    PROJECT="$1"
+    
+    ## No project, print current releases.
+    if test ! -n "${PROJECT}"; then
+        sbug rec @ongoing | recsel -e 'Type = "release"' -C -R Project >&2
+        echo "" >&2
+        echo "error: Please specify a project." >&2
+        return 1
+    fi
+    
+    ## Parse release information.
+    filter="Project = \"${PROJECT}\" && Type = \"release\""
+    read -r RELFILE MESSAGE <<-EOF
+	$(sbug rec @ongoing | recsel -e "${filter}" -C -R File,Changelog)
+	EOF
+    if test ! -n "${RELFILE}"; then
+        echo >&2 "error: ${PROJECT}: No release task for project."
+        return 1
+    fi
+    RELCODE="$(sbug_get_id "${RELFILE}")"
+
+    ## Generate list.
+    if test -n "${CHANGELOG_FILE}"; then
+        if test -f "${CHANGELOG_FILE}"; then
+            sed "\\|(task/${RELCODE})|,\\|(task/${RELCODE})|{N;d;}" "${CHANGELOG_FILE}"
+        fi > "${CHANGELOG_FILE}.old"
+        sbug_changelog_list > "${CHANGELOG_FILE}"
+        cat "${CHANGELOG_FILE}.old" >> "${CHANGELOG_FILE}"
+        rm "${CHANGELOG_FILE}.old"
+    fi
+    
+}
+
+sbug_changelog_list() {
+    local file assignee changelog id
+    local filter="Project = \"${PROJECT}\" && Public = \"yes\" && Changelog != \"\""
+    echo "$(date +%Y-%m-%d)  ${VERSION}  ${MESSAGE} (task/${RELCODE})"
+    echo ""
+    sbug rec @done \
+    | recsel -i -e "${filter}" -C -R File,Assignee,Changelog \
+    | while read -r file assignee changelog
+    do
+        id="$(sbug_get_id "${file}")"
+        if test -f "${CHANGELOG_FILE}" && grep -q "(task/${id})" "${CHANGELOG_FILE}"; then
+            continue
+        fi
+        echo "	- (task/${id}) ${changelog}"
+    done
+    echo "	- (task/${RELCODE}) New release."
+    echo ""
+}
+## -------------------------------------------------------------------
+if test @"${SCRNAME:-$(basename "$0")}" = @"sbug-changelog"; then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         sbug_changelog "$@"; exit 0;;
+    esac
+fi

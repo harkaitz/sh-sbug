@@ -102,12 +102,13 @@ sbug_refill() {
         echo "Creating ${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt ..."
         ${SBUG_SUDO} tee "${SBUG_DIRECTORY}/@new/@${idt}_no_desc.txt" <<-EOF >/dev/null
 	Project:
-	Type:       # bug/feature
+	Type:       # bug/feature/release
 	Subject:
 	Public: no  # yes if it is meant to be shown to client.
 	Priority:   # 0 (Highest) 9 (Lowest)
 	Assignee:   # The assigned person.
 	Reporter:   # Your name.
+	Changelog:
 	
 	No description.
 	EOF

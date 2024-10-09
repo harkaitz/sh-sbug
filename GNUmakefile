@@ -41,4 +41,5 @@ install-sh:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp bin/sbug $(DESTDIR)$(PREFIX)/bin
 	cp bin/sbug-ctl $(DESTDIR)$(PREFIX)/bin
+	cp bin/sbug-changelog $(DESTDIR)$(PREFIX)/bin
 ## -- BLOCK:sh --
