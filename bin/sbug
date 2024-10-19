@@ -26,7 +26,7 @@ sbug() {
         'back')    sbug_move "@done @ongoing @closed @cancelled @todo" "@back" "$@";;
         'done')    sbug_move "@todo @ongoing" "@done"      "$@" ;;
         'close')   sbug_move "@done @ongoing" "@closed"    "$@" ;;
-        'cancel')  sbug_move "@todo @ongoing" "@cancelled" "$@" ;;
+        'cancel')  sbug_move "@done @todo @ongoing" "@cancelled" "$@" ;;
         'start')   sbug_move "@todo"          "@ongoing"   "$@" ;;
         branch|b)  sbug_branch "$@" ;;
         rename)    sbug_rename "$@" ;;

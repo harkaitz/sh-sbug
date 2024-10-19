@@ -9,6 +9,27 @@ Small multiuser bug tracking system.
 
 ## Help
 
+chlog2html
+
+    Usage: chlog2html CHANGELOG > HTML
+    
+    This program converts a changelog to a publishable html. This can
+    be used to publish the changelog in web products.
+    
+    The format of the changelog read is as follows:
+    
+       DATE  VERSION  DESCRIPTION
+    
+           - CHANGE 1
+           - CHANGE 2
+    
+       DATE  VERSION  DESCRIPTION
+    
+           - CHANGE 3
+           - CHANGE 4
+    
+    Environment variables: None
+
 sbug
 
     Usage: sbug ...

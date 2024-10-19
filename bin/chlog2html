@@ -1,0 +1,41 @@
+#!/bin/sh -e
+##:
+#h: Usage: chlog2html CHANGELOG > HTML
+#h:
+#h: This program converts a changelog to a publishable html. This can
+#h: be used to publish the changelog in web products.
+#h:
+#h: The format of the changelog read is as follows:
+#h:
+#h:    DATE  VERSION  DESCRIPTION
+#h:
+#h:        - CHANGE 1
+#h:        - CHANGE 2
+#h:
+#h:    DATE  VERSION  DESCRIPTION
+#h:
+#h:        - CHANGE 3
+#h:        - CHANGE 4
+#h:
+#h: Environment variables: None
+##:
+chlog2html() {
+    local changelog
+    for changelog in "$@"; do
+        sed -n '
+        s| *(task/[0-9]*) *||g
+        1i<ul>
+        1s|^\(20..-..-..\)  *\([0-9\.]*\)  *\(.*\)$|<li>\n  <strong>\1 \2</strong> \3\n  <ul>|p
+         s|^\(20..-..-..\)  *\([0-9\.]*\)  *\(.*\)$|  </ul>\n</li>\n<li>\n  <strong>\1 \2</strong> \3\n  <ul>|p
+        $a\ \ </ul>\n</li>\n</ul>
+         s|^\s*-\s*\(.*\)$|    <li>\1</li>|p
+        ' "${changelog}" | sed '/New release/d'
+    done
+}
+## -------------------------------------------------------------------
+if test @"${SCRNAME:-$(basename "$0")}" = @"chlog2html"; then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            chlog2html "$@"; exit 0;;
+    esac
+fi
